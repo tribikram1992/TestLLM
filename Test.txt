@@ -1,1 +1,1584 @@
 
+Technical Implementation
+��Layer 2 — Complete Developer Implementation Guide
+Pre-requisite: Layer 1 is complete and exposes APIs to retrieve: parsed requirement, App Model, KB signals, existing test
+repository. Goal: Build Layer 2 (Test Design Layer) end-to-end this week. Approach: Step-by-step — nothing skipped. Every
+prompt, schema, formula, endpoint, and test included.
+��Week-at-a-Glance
+1 Day 1 → Step 1: DB Setup
+2 Step 2: Project Scaffolding
+3 Step 3: Layer 1 Consumer Client
+4 Day 2 → Step 4: Technique Engine — Prompt + Service
+5 Day 3 → Step 5: Output Validation + Retry Logic
+6 Day 4 → Step 6: Risk Prioritization Engine
+7 Day 5 → Step 7: SME Override System
+8 Step 8: Coverage Gap Analysis
+9 Day 6 → Step 9: Classification Engine
+10 Step 10: Layer 3 Handoff Hint Generator
+11 Day 7 → Step 11: End-to-End Pipeline + Endpoint
+12 Step 12: Smoke Testing + Sample Inputs
+13
+14
+Day 7 → Step 11: End-to-End Pipeline + EndpointStep 12: Smoke Testing + Sample Inputs
+STEP 1: Database Setup (Day 1 Morning)
+Create All Tables
+1 -- =============================================================
+2 -- 1. Test conditions produced by Technique Engine
+3 -- =============================================================
+4 CREATE TABLE design_conditions (
+5 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+6 project_id UUID NOT NULL,
+7 requirement_id VARCHAR(100) NOT NULL,
+8 condition_id VARCHAR(50) NOT NULL,
+9 title VARCHAR(500) NOT NULL,
+10 description TEXT,
+11 technique VARCHAR(50) NOT NULL,
+12 classifications TEXT[],
+13 grounded_in JSONB,
+14 risk_score DECIMAL(3,1),
+JSON
+SQL
+15 priority VARCHAR(5),
+16 risk_rationale TEXT,
+17 risk_components JSONB,
+18 coverage_status VARCHAR(20),
+19 matched_test_ids TEXT[],
+20 confidence VARCHAR(20),
+21 handoff_hints JSONB,
+22 test_data_intent JSONB,
+23 created_at TIMESTAMP DEFAULT NOW()
+24 );
+25 CREATE INDEX idx_conditions_req ON design_conditions(project_id, requirement_id);
+26 CREATE INDEX idx_conditions_priority ON design_conditions(priority);
+27 -- =============================================================
+28 -- 2. Final design package (one per requirement, latest version active)
+29 -- =============================================================
+30 CREATE TABLE design_packages (
+31 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+32 project_id UUID NOT NULL,
+33 requirement_id VARCHAR(100) NOT NULL,
+34 package_data JSONB NOT NULL,
+35 total_conditions INT,
+36 uncovered_count INT,
+37 p1_count INT,
+38 technique_distribution JSONB,
+39 is_active BOOLEAN DEFAULT TRUE,
+40 generated_at TIMESTAMP DEFAULT NOW()
+41 );
+42 CREATE INDEX idx_packages_req ON design_packages(project_id, requirement_id);
+43 -- =============================================================
+44 -- 3. Module metadata for risk scoring
+45 -- =============================================================
+46 CREATE TABLE app_model_module_metadata (
+47 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+48 app_model_id UUID NOT NULL,
+49 module_name VARCHAR(200) NOT NULL,
+50 business_criticality VARCHAR(20) DEFAULT 'standard', -- critical | standard | edge
+51 compliance_flag VARCHAR(50), -- gxp | sox | hipaa | internal_audit | n
+52 user_exposure VARCHAR(50) DEFAULT 'internal_business_users',
+53 data_sensitivity VARCHAR(50), -- financial | pii | data_processing | st
+54 recently_changed BOOLEAN DEFAULT FALSE,
+55 tagged_by VARCHAR(100),
+56 tagged_at TIMESTAMP DEFAULT NOW(),
+57 UNIQUE(app_model_id, module_name)
+58 );
+59 -- =============================================================
+60 -- 4. SME Overrides
+61 -- =============================================================
+62 CREATE TABLE sme_overrides (
+63 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+64 project_id UUID NOT NULL,
+65 scope VARCHAR(20) NOT NULL, -- requirement | module | condition
+66 target_id VARCHAR(200) NOT NULL,
+67 override_flag VARCHAR(50) NOT NULL,
+68 reason TEXT NOT NULL,
+69 tagged_by VARCHAR(100) NOT NULL,
+70 expires_at TIMESTAMP,
+71 is_active BOOLEAN DEFAULT TRUE,
+72 created_at TIMESTAMP DEFAULT NOW()
+73 );
+74 CREATE INDEX idx_overrides_target ON sme_overrides(scope, target_id) WHERE is_active = TRUE;
+75 -- =============================================================
+76 -- 5. Generation run log (audit trail)
+77 -- =============================================================
+78 CREATE TABLE design_generation_runs (
+79 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+80 project_id UUID NOT NULL,
+81 requirement_id VARCHAR(100) NOT NULL,
+82 prompt_version VARCHAR(20),
+83 model_used VARCHAR(50),
+84 total_tokens INT,
+85 retries_attempted INT DEFAULT 0,
+86 status VARCHAR(20), -- success | failed | partial
+87 error_details TEXT,
+88 duration_ms INT,
+89 created_at TIMESTAMP DEFAULT NOW()
+90 );
+91
+92
+-- =============================================================-- 5. Generation run log (audit trail)-
+- =============================================================CREATE TABLE design_generation_runs (id 
+ UUID PRIMARY KEY DEFAULT gen_random_uuid(),project_id UUID NOT NULL,requirement_id 
+ VARCHAR(100) NOT NULL,prompt_version VARCHAR(20),model_used VARCHAR(50),total_tokens 
+INT,retries_attempted INT DEFAULT 0,status VARCHAR(20), -- success | failed | 
+partialerror_details TEXT,duration_ms INT,created_at TIMESTAMP DEFAULT NOW());
+Acceptance
+• Run migration twice → no errors (idempotent)
+• All 5 tables exist
+• Indices created
+STEP 2: Project Scaffolding (Day 1 Afternoon)
+Folder Structure
+1 /layer2-service
+2 ├── /src
+3 │ ├── /api (route handlers)
+4 │ ├── /services
+5 │ │ ├── technique_engine/
+6 │ │ ├── risk_engine/
+7 │ │ ├── gap_analyzer/
+8 │ │ ├── classifier/
+9 │ │ ├── handoff_generator/
+10 │ │ └── pipeline.py
+11 │ ├── /clients
+12 │ │ ├── layer1_client.py
+13 │ │ └── llm_client.py
+14 │ ├── /validators
+15 │ │ └── condition_validator.py
+16 │ ├── /prompts
+17 │ │ ├── system_prompt.txt
+18 │ │ └── user_prompt_template.txt
+19 │ ├── /db
+20 │ │ ├── migrations/
+21 │ │ └── repositories/
+22 │ └── /models
+23 │ └── condition.py
+24 ├── /tests
+25 │ ├── /unit
+26 │ ├── /integration
+27 │ └── /samples (sample requirements for smoke testing)
+28 └── README.md
+29
+SQL
+Tech Stack Recommendation
+• Language: Python (FastAPI) or Node.js (Express) — match Layer 1
+• DB driver: asyncpg / pg
+• LLM SDK: openai (compatible with Azure OpenAI)
+• Embeddings: OpenAI text-embedding-3-small (same as Layer 1)
+STEP 3: Layer 1 Consumer Client (Day 1 Evening)
+What to Build
+A wrapper service that calls Layer 1 APIs to fetch all context needed for Layer 2.
+Implementation
+1 class Layer1Client:
+2 def init(self, base_url):
+3 self.base_url = base_url
+4 def get_requirement(self, project_id, requirement_id):
+5 # GET /api/layer1/requirement/{requirement_id}
+6 # Returns: { id, text, parsedEntities }
+7 ...
+8
+9 def get_app_model(self, project_id):
+10 # GET /api/layer1/app-model/{project_id}/active
+11 # Returns: { apiContracts, pageObjectModel, schemaGraph, businessRules, modules }
+12 ...
+13
+14 def get_kb_signals(self, project_id, requirement_id, requirement_text):
+15 # POST /api/layer1/kb/search/semantic
+16 # Body: { query: requirement_text, topK: 10, sourceTypes: ['defect', 'incident', 'test_case']
+17 # Returns: { relatedDefects, relatedIncidents, relatedRequirements, similarTestCases }
+18 ...
+19
+20 def get_existing_tests(self, project_id, module_name=None):
+21 # GET /api/layer1/kb/test-cases/{project_id}?module={module_name}
+22 # Returns: list of { id, title, description, embedding }
+23 ...
+24
+25 def get_module_metadata(self, app_model_id, module_name):
+26 # GET /api/layer2/module-metadata/{app_model_id}/{module_name}
+27 # Returns: { businessCriticality, complianceFlag, userExposure, dataSensitivity, recentlyChan
+28 # If module not found, return defaults
+29 ...
+30
+31 def get_full_context(self, project_id, requirement_id):
+32 requirement = self.get_requirement(project_id, requirement_id)
+33 return {
+34 "requirement": requirement,
+35 "appModel": self.get_app_model(project_id),
+36 "kbSignals": self.get_kb_signals(project_id, requirement_id, requirement.text),
+37 "existingTests": self.get_existing_tests(project_id),
+38 }
+39
+40
+Python
+Acceptance
+• get_full_context() returns complete context bundle in one call
+• All 4 sub-calls handle errors gracefully (returns empty data on Layer 1 failure)
+STEP 4: Technique Engine (Day 2 — Full Day)
+This is the most important component. Build carefully.
+4.1 The System Prompt — Save as prompts/system_prompt.txt
+1 You are a Senior QA Test Architect with 15+ years of experience designing
+2 comprehensive test suites for enterprise applications. You apply FORMAL test
+3 design techniques rigorously — not intuition.
+4 ═══════════════════════════════════════════════════════════════════════
+5 YOUR TASK
+6 ═══════════════════════════════════════════════════════════════════════
+7 Given a requirement and its application context, produce a complete list of
+8 ABSTRACT TEST CONDITIONS by applying the 5 formal test design techniques below.
+9 You are NOT writing executable test cases or step-by-step instructions. You are
+10 designing test CONDITIONS — precise, technique-tagged statements describing
+11 WHAT should be tested and WHY.
+12 ═══════════════════════════════════════════════════════════════════════
+13 THE 5 TECHNIQUES YOU MUST APPLY
+14 ═══════════════════════════════════════════════════════════════════════
+15 ▶ TECHNIQUE 1: EQUIVALENCE PARTITIONING (EP)
+16 WHAT: Divide input data into classes where all values behave the same way.
+17 APPLY WHEN: Any input has identifiable valid and invalid classes.
+18 HOW:
+19 For each input field, identify valid and invalid partitions.
+20 Produce ONE test condition per partition (representative value).
+21 Title format: "Verify [behavior] when [field] is [partition description]"
+22 EXAMPLE (text field):
+23 "Verify username is accepted when value contains valid alphanumeric chars"
+24 "Verify username is rejected when value contains special characters"
+25 EXAMPLE (file upload):
+26 "Verify upload is accepted when file format is PDF"
+27 "Verify upload is rejected when file format is EXE"
+28 ▶ TECHNIQUE 2: BOUNDARY VALUE ANALYSIS (BVA)
+29 WHAT: Test at the EXACT EDGES of input ranges. Defects hide at boundaries.
+30 APPLY WHEN: Any input has limits — numeric, string length, date, file size, count.
+31 HOW:
+32 For each bounded field, produce conditions for: min-1, min, min+1,
+33 max-1, max, max+1.
+34 Title format: "Verify [behavior] when [field] is [exact boundary value]"
+35 EXAMPLE (string length):
+36 "Verify comment is rejected when length is 0 (just below min)"
+37 "Verify comment is accepted when length is exactly 500 (at max)"
+38 "Verify comment is rejected when length is 501 (just above max)"
+39 EXAMPLE (date range):
+40 "Verify booking is rejected when date is yesterday (past)"
+41 "Verify booking is accepted when date is exactly today (at min)"
+42 ▶ TECHNIQUE 3: DECISION TABLE
+43 WHAT: Test combinations of conditions that lead to different outcomes.
+44 APPLY WHEN: Multiple conditions/business rules combine to determine behavior.
+45 HOW:
+46 Identify all conditions involved.
+47 Create rules for meaningful combinations — each producing a DIFFERENT outcome.
+48 Title format: "Verify [outcome] when [condition1=value, condition2=value...]"
+49 EXAMPLE (access control):
+50 "Verify access granted when: logged_in=Y, has_admin_role=Y"
+Python
+51 "Verify 401 when: logged_in=N"
+52 "Verify 403 when: logged_in=Y, has_admin_role=N, owns_resource=N"
+53 ▶ TECHNIQUE 4: STATE TRANSITION
+54 WHAT: Test movement between states in a workflow.
+55 APPLY WHEN: The feature has a state machine, workflow, or lifecycle.
+56 HOW:
+57 Map all states.
+58 Produce conditions for: valid transitions, invalid transitions, rollback paths.
+59 Title format: "Verify state transitions from [A] to [B] when [trigger]"
+60 EXAMPLE (order lifecycle):
+61 "Verify state moves from Cart to Placed when user clicks Checkout"
+62 "Verify cannot transition from Cart directly to Shipped (skip protection)"
+63 ▶ TECHNIQUE 5: PAIRWISE COMBINATION
+64 WHAT: Cover all PAIRS of multi-factor combinations efficiently.
+65 APPLY WHEN: 3+ factors with multiple values each combine.
+66 HOW:
+67 Identify factors and their values.
+68 Generate test conditions covering all PAIRS (not full Cartesian product).
+69 Title format: "Verify [feature] works for [factor1=value, factor2=value, ...]"
+70 EXAMPLE (compatibility):
+71 "Verify feature works for: browser=Chrome, OS=Windows, role=Admin"
+72 "Verify feature works for: browser=Firefox, OS=macOS, role=Viewer"
+73 ═══════════════════════════════════════════════════════════════════════
+74 ALSO CONSIDER (when applicable)
+75 ═══════════════════════════════════════════════════════════════════════
+76 ▶ Negative/Validation conditions (always include these)
+77 Empty/null values
+78 Wrong data types
+79 Special characters (SQL injection, XSS)
+80 Exceeding length limits
+81 Malformed inputs
+82 ▶ Security conditions (when auth/roles/data sensitivity involved)
+83 Authentication bypass attempts
+84 Authorization checks
+85 Session/token handling
+86 ▶ Performance conditions (when SLAs mentioned in requirement)
+87 Response time at expected load
+88 Behavior under data volume
+89 ═══════════════════════════════════════════════════════════════════════
+90 GROUNDING RULES (CRITICAL)
+91 ═══════════════════════════════════════════════════════════════════════
+92 You MUST ground every test condition in the App Model provided in the user prompt:
+93 ✅ DO: Use the EXACT field names, API endpoints, entity names, and business
+94 rules from the App Model.
+95 GOOD: "Verify rejection when 'PO Number' field starts with leading zeros"
+96 GOOD: "Verify GET /api/documents returns 401 when token is missing"
+97 ❌ DO NOT: Invent fields, endpoints, or behaviors not in the App Model.
+98 BAD: "Verify the submit button works" (which submit button?)
+99 BAD: "Test the user form" (which form?)
+100 If the App Model lacks information needed for a technique, SKIP that technique
+101 for that field — do not invent. Note the skip in the output with reason.
+102 ═══════════════════════════════════════════════════════════════════════
+103 TECHNIQUE COVERAGE RULES
+104 ═══════════════════════════════════════════════════════════════════════
+105 APPLY AT LEAST 4 OF THE 5 TECHNIQUES when the requirement supports them.
+106 Skip a technique only if genuinely not applicable.
+107 Always include happy path + at least one negative scenario.
+108 For each applicable technique, produce 2-5 conditions minimum.
+109 Aim for 15-40 total conditions for a typical requirement.
+110 Each condition must be ATOMIC — one specific behavior verified per condition.
+111 ═══════════════════════════════════════════════════════════════════════
+112 KNOWLEDGE BASE INTEGRATION
+113 ═══════════════════════════════════════════════════════════════════════
+114 The user prompt may include a "Related Defects" section. If present:
+115 Generate AT LEAST ONE condition that would catch each related defect.
+116 In the condition's groundedIn.relatedDefects field, list the defect IDs.
+117 Mark these conditions with confidence: "high".
+118 ═══════════════════════════════════════════════════════════════════════
+119 OUTPUT FORMAT (STRICT JSON)
+120 ═══════════════════════════════════════════════════════════════════════
+121 You MUST output ONLY valid JSON matching this schema. No markdown, no
+122 explanations outside the JSON.
+123 {
+124 "requirementId": "string (echoed from input)",
+125 "designSummary": {
+126 "totalConditions": <integer>,
+127 "techniqueDistribution": {
+128 "equivalence_partitioning": <integer>,
+129 "boundary_value_analysis": <integer>,
+130 "decision_table": <integer>,
+131 "state_transition": <integer>,
+132 "pairwise_combination": <integer>,
+133 "negative_validation": <integer>,
+134 "security": <integer>,
+135 "performance": <integer>
+136 },
+137 "skippedTechniques": [
+138 { "technique": "string", "reason": "string" }
+139 ]
+140 },
+141 "conditions": [
+142 {
+143 "id": "TC-001",
+144 "title": "Verify [specific behavior] when [specific condition]",
+145 "description": "1-2 sentences explaining what this verifies and why",
+146 "technique": "equivalence_partitioning | boundary_value_analysis | decision_table | state_transit
+147 "groundedIn": {
+148 "fields": ["array of field names from App Model"],
+149 "endpoints": ["array of API paths from App Model"],
+150 "entities": ["array of entity names from Schema Graph"],
+151 "businessRules": ["array of business rule references"],
+152 "relatedDefects": ["array of defect IDs if applicable"]
+153 },
+154 "testDataIntent": {
+155 "input": "description of input values needed (e.g., 'exactly 500 chars unicode string')",
+156 "expected": "description of expected outcome (e.g., 'Rejected with error: length exceeded')"
+157 },
+158 "confidence": "high | medium | low",
+159 "rationale": "1-line reason this condition matters"
+160 }
+161 ]
+162 }
+163 ═══════════════════════════════════════════════════════════════════════
+164 QUALITY RULES — BANNED PATTERNS
+165 ═══════════════════════════════════════════════════════════════════════
+166 ❌ NEVER use vague phrases:
+167 "should work correctly"
+168 "behaves as expected"
+169 "no errors occur"
+170 "functions properly"
+171 "works fine"
+172 ❌ NEVER produce duplicate conditions (same input/output covered twice).
+173 ❌ NEVER mix techniques — each condition is ONE technique.
+174 ❌ NEVER include actual test SCRIPTS, step-by-step instructions, or code.
+175 That's a downstream layer's job. You produce CONDITIONS only.
+176 ✅ Every condition must be ATOMIC, GROUNDED, and TECHNIQUE-TAGGED.
+177
+178
+✅ Every condition must be ATOMIC, GROUNDED, and TECHNIQUE-TAGGED.
+4.2 The User Prompt Template — Save as prompts/user_prompt_template.txt
+1 ═══════════════════════════════════════════════════════════════════════
+2 REQUIREMENT TO TEST
+3 ═══════════════════════════════════════════════════════════════════════
+4 ID: {requirement_id}
+5 Title: {requirement_title}
+Python
+6 Description:
+7 {requirement_description}
+8 Parsed Entities (from Layer 1 Ingestion):
+9 {parsed_entities_json}
+10 ═══════════════════════════════════════════════════════════════════════
+11 APP MODEL CONTEXT (from Layer 1)
+12 ═══════════════════════════════════════════════════════════════════════
+13 ▶ Relevant API Endpoints:
+14 {api_contracts_json}
+15 ▶ Relevant UI Pages & Elements:
+16 {page_object_model_json}
+17 ▶ Relevant Data Entities:
+18 {schema_graph_json}
+19 ▶ Applicable Business Rules:
+20 {business_rules_json}
+21 ═══════════════════════════════════════════════════════════════════════
+22 KNOWLEDGE BASE SIGNALS (from Layer 1 KB)
+23 ═══════════════════════════════════════════════════════════════════════
+24 ▶ Related Past Defects (use these to design regression conditions):
+25 {related_defects_json}
+26 ▶ Related Incidents:
+27 {related_incidents_json}
+28 ▶ Related Requirements (for context):
+29 {related_requirements_json}
+30 ═══════════════════════════════════════════════════════════════════════
+31 COVERAGE HINTS (what's already tested)
+32 ═══════════════════════════════════════════════════════════════════════
+33 The following areas already have test coverage. Avoid duplicating these:
+34 {existing_test_titles_json}
+35 ═══════════════════════════════════════════════════════════════════════
+36 NOW PRODUCE THE DESIGN
+37 ═══════════════════════════════════════════════════════════════════════
+38 Apply all applicable techniques. Ground every condition in the App Model.
+39 Generate 15-40 atomic test conditions. Output ONLY the JSON.
+40
+41
+Apply all applicable techniques. Ground every condition in the App Model.Generate 15-40 atomic test 
+conditions. Output ONLY the JSON.
+4.3 Prompt Assembler Service
+1 import json
+2 from pathlib import Path
+3 class PromptAssembler:
+4 def init(self):
+5 self.system_prompt = Path("prompts/system_prompt.txt").read_text()
+6 self.user_template = Path("prompts/user_prompt_template.txt").read_text()
+7 def build(self, context):
+8 """
+9 context = {
+10 "requirement": {...},
+11 "appModel": {...},
+12 "kbSignals": {...},
+13 "existingTests": [...]
+14 }
+15 """
+16 req = context["requirement"]
+17 app_model = context["appModel"]
+18 kb = context["kbSignals"]
+19
+20 # Filter App Model to relevant subset (avoid token bloat)
+21 relevant_endpoints = self.filter_endpoints(app_model, req)
+22 relevant_pages = self.filter_pages(app_model, req)
+23 relevant_entities = self.filter_entities(app_model, req)
+24 relevant_rules = self.filter_rules(app_model, req)
+Python
+25
+26 user_prompt = self.user_template.format(
+27 requirement_id=req["id"],
+28 requirement_title=req.get("title", ""),
+29 requirement_description=req["text"],
+30 parsed_entities_json=json.dumps(req.get("parsedEntities", {}), indent=2),
+31 api_contracts_json=json.dumps(relevant_endpoints, indent=2),
+32 page_object_model_json=json.dumps(relevant_pages, indent=2),
+33 schema_graph_json=json.dumps(relevant_entities, indent=2),
+34 business_rules_json=json.dumps(relevant_rules, indent=2),
+35 related_defects_json=json.dumps(kb.get("relatedDefects", []), indent=2),
+36 related_incidents_json=json.dumps(kb.get("relatedIncidents", []), indent=2),
+37 related_requirements_json=json.dumps(kb.get("relatedRequirements", []), indent=2),
+38 existing_test_titles_json=json.dumps(
+39 [t["title"] for t in context["existingTests"]], indent=2
+40 ),
+41 )
+42
+43 return self.system_prompt, user_prompt
+44
+45 def filter_endpoints(self, app_model, req):
+46 # Return endpoints related to the requirement (basic keyword match for now)
+47 # Stage 2: use semantic similarity
+48 return app_model.get("apiContracts", [])
+49
+50 def filter_pages(self, app_model, req):
+51 return app_model.get("pageObjectModel", [])
+52
+53 def filter_entities(self, app_model, req):
+54 return app_model.get("schemaGraph", {}).get("entities", [])
+55
+56 def filter_rules(self, app_model, req):
+57 return app_model.get("businessRules", [])
+58
+59
+4.4 LLM Client
+1 from openai import OpenAI
+2 import json
+3 class LLMClient:
+4 def init(self, api_key, model="gpt-4o", temperature=0.2):
+5 self.client = OpenAI(api_key=api_key)
+6 self.model = model
+7 self.temperature = temperature
+8 def generate(self, system_prompt, user_prompt):
+9 response = self.client.chat.completions.create(
+10 model=self.model,
+11 temperature=self.temperature,
+12 response_format={"type": "json_object"},
+13 max_tokens=4000,
+14 messages=[
+15 {"role": "system", "content": system_prompt},
+16 {"role": "user", "content": user_prompt}
+17 ]
+18 )
+19
+20 content = response.choices[0].message.content
+21 usage = response.usage.total_tokens
+22
+23 return {
+24 "output": json.loads(content),
+25 "tokens": usage
+26 }
+27
+28
+Python
+4.5 Technique Engine Service
+1 class TechniqueEngine:
+2 def init(self, prompt_assembler, llm_client, validator, repository):
+3 self.assembler = prompt_assembler
+4 self.llm = llm_client
+5 self.validator = validator
+6 self.repo = repository
+7 def generate(self, context, max_retries=2):
+8 system_prompt, user_prompt = self.assembler.build(context)
+9
+10 for attempt in range(max_retries + 1):
+11 result = self.llm.generate(system_prompt, user_prompt)
+12 output = result["output"]
+13
+14 is_valid, errors = self.validator.validate(output)
+15 if is_valid:
+16 return output, result["tokens"]
+17
+18 # Corrective retry
+19 user_prompt += f"\n\nYour previous output failed validation: {errors}. Please fix and reg
+20
+21 raise Exception(f"Generation failed after {max_retries + 1} attempts: {errors}")
+22
+23
+4.6 API Endpoint
+1 @app.post("/api/design/techniques")
+2 async def run_technique_engine(payload: dict):
+3 project_id = payload["projectId"]
+4 requirement_id = payload["requirementId"]
+5 # 1. Fetch context from Layer 1
+6 context = layer1_client.get_full_context(project_id, requirement_id)
+7
+8 # 2. Run Technique Engine
+9 output, tokens_used = technique_engine.generate(context)
+10
+11 # 3. Persist conditions
+12 conditions = output["conditions"]
+13 for c in conditions:
+14 repository.save_condition(project_id, requirement_id, c)
+15
+16 # 4. Log run
+17 repository.log_generation_run(
+18 project_id, requirement_id,
+19 model="gpt-4o", tokens=tokens_used, status="success"
+20 )
+21
+22 return output
+23
+24
+Acceptance for STEP 4
+• API returns 15-40 conditions for a typical requirement
+• Each condition has id, title, technique, groundedIn, confidence
+• At least 4 techniques represented when applicable
+• Conditions persisted in DB
+Python
+Python
+STEP 5: Output Validation + Retry Logic (Day 3)
+5.1 Condition Validator
+1 class ConditionValidator:
+2 BANNED_PHRASES = [
+3 "should work correctly", "behaves as expected",
+4 "no errors occur", "works fine", "functions properly",
+5 "as expected"
+6 ]
+7 REQUIRED_FIELDS = ["id", "title", "description", "technique",
+8 "groundedIn", "testDataIntent", "confidence", "rationale"]
+9
+10 VALID_TECHNIQUES = {
+11 "equivalence_partitioning", "boundary_value_analysis",
+12 "decision_table", "state_transition", "pairwise_combination",
+13 "negative_validation", "security", "performance",
+14 "happy_path", "edge_case"
+15 }
+16
+17 def validate(self, output):
+18 errors = []
+19
+20 # 1. JSON schema check
+21 if not isinstance(output, dict):
+22 return False, ["Output is not a JSON object"]
+23 if "conditions" not in output:
+24 return False, ["Missing 'conditions' field"]
+25
+26 conditions = output["conditions"]
+27 if len(conditions) == 0:
+28 return False, ["No conditions generated"]
+29
+30 # 2. Per-condition checks
+31 seen_titles = set()
+32 techniques_used = set()
+33
+34 for i, c in enumerate(conditions):
+35 # Required fields
+36 for field in self.REQUIRED_FIELDS:
+37 if field not in c:
+38 errors.append(f"Condition {i}: missing field '{field}'")
+39
+40 # Valid technique
+41 if c.get("technique") not in self.VALID_TECHNIQUES:
+42 errors.append(f"Condition {i}: invalid technique '{c.get('technique')}'")
+43 else:
+44 techniques_used.add(c["technique"])
+45
+46 # Banned phrases
+47 text = (c.get("title", "") + " " +
+48 c.get("description", "") + " " +
+49 str(c.get("testDataIntent", {}).get("expected", ""))).lower()
+50 for phrase in self.BANNED_PHRASES:
+51 if phrase in text:
+52 errors.append(f"Condition {i}: contains banned phrase '{phrase}'")
+53
+54 # Duplicate titles
+55 title = c.get("title", "").strip().lower()
+56 if title in seen_titles:
+57 errors.append(f"Condition {i}: duplicate title")
+58 seen_titles.add(title)
+Python
+59
+60 # GroundedIn must exist
+61 if not c.get("groundedIn"):
+62 errors.append(f"Condition {i}: missing groundedIn references")
+63
+64 # 3. Technique coverage
+65 if len(techniques_used) &lt; 4:
+66 errors.append(f"Insufficient technique coverage: only {len(techniques_used)} techniques u
+67
+68 return len(errors) == 0, errors
+69
+70
+5.2 Corrective Prompt Builder
+When validation fails, build a corrective retry prompt:
+1 def build_corrective_prompt(original_user_prompt, errors):
+2 correction = "\n\n═══════════════════════════════════════════════════════\n"
+3 correction += "CORRECTION NEEDED — Your previous output failed validation:\n"
+4 correction += "═══════════════════════════════════════════════════════\n"
+5 for err in errors[:10]: # cap at 10 errors
+6 correction += f"- {err}\n"
+7 correction += "\nRegenerate the output strictly following the rules. Output ONLY valid JSON.\n"
+8 return original_user_prompt + correction
+9
+Acceptance for STEP 5
+• All 6 validation rules implemented
+• Banned phrases never reach output
+• Retry attempted up to 2 times before failure
+• All validator unit tests pass
+STEP 6: Risk Prioritization Engine (Day 4)
+6.1 Likelihood Computer
+1 class LikelihoodComputer:
+2 TECHNIQUE_RISK = {
+3 "negative_validation": 3,
+4 "boundary_value_analysis": 3,
+5 "state_transition": 3,
+6 "security": 3,
+7 "decision_table": 2,
+8 "equivalence_partitioning": 2,
+9 "performance": 2,
+10 "edge_case": 2,
+11 "pairwise_combination": 1,
+12 "happy_path": 1,
+13 }
+14 def compute(self, condition, app_model):
+15 L1 = self.TECHNIQUE_RISK.get(condition["technique"], 2)
+16
+Python
+Python
+17 rule_count = len(condition.get("groundedIn", {}).get("businessRules", []))
+18 L2 = 3 if rule_count &gt;= 5 else (2 if rule_count &gt;= 2 else 1)
+19
+20 endpoint_count = len(condition.get("groundedIn", {}).get("endpoints", []))
+21 L3 = 3 if endpoint_count &gt;= 3 else (2 if endpoint_count &gt;= 1 else 1)
+22
+23 field_count = self._count_constrained_fields(condition, app_model)
+24 L4 = 3 if field_count &gt;= 4 else (2 if field_count &gt;= 2 else 1)
+25
+26 likelihood = (L1 + L2 + L3 + L4) / 4.0
+27 return min(likelihood, 3.0), {"L1": L1, "L2": L2, "L3": L3, "L4": L4}
+28
+29 def _count_constrained_fields(self, condition, app_model):
+30 fields = condition.get("groundedIn", {}).get("fields", [])
+31 # Count fields that have constraints in the App Model
+32 constrained = 0
+33 for field_name in fields:
+34 if app_model.is_field_constrained(field_name):
+35 constrained += 1
+36 return constrained
+37
+38
+6.2 Impact Computer
+1 class ImpactComputer:
+2 COMPLIANCE_KEYWORDS_HIGH = {"gxp", "validated", "compliance", "audit",
+3 "regulatory", "sox", "hipaa", "21 cfr", "21cfr"}
+4 COMPLIANCE_KEYWORDS_MED = {"policy", "governance", "internal control"}
+5 FINANCIAL_KEYWORDS = {"payment", "transfer", "debit", "credit", "refund",
+6 "invoice", "billing", "settlement", "transaction",
+7 "financial", "money", "amount", "tax"}
+8 PII_KEYWORDS = {"pii", "personal data", "sensitive", "customer data",
+9 "ssn", "account number", "credit card", "phi"}
+10 REPORTING_KEYWORDS = {"report", "dashboard", "kpi", "metric", "analytics"}
+11
+12 CRITICALITY_MAP = {"critical": 3, "standard": 2, "edge": 1}
+13 EXPOSURE_MAP = {
+14 "customer_facing": 3, "partner_facing": 3,
+15 "internal_business_users": 2, "internal_admin": 1,
+16 }
+17
+18 def compute(self, condition, app_model, requirement_text):
+19 module = app_model.get_module_for_condition(condition)
+20 req_lower = requirement_text.lower()
+21
+22 I1 = self.CRITICALITY_MAP.get(module.business_criticality, 2)
+23 I2 = self._compute_compliance(module, req_lower)
+24 I3 = self.EXPOSURE_MAP.get(module.user_exposure, 2)
+25 I4 = self._compute_financial_data(module, req_lower)
+26
+27 impact = (I1 + I2 + I3 + I4) / 4.0
+28 return min(impact, 3.0), {"I1": I1, "I2": I2, "I3": I3, "I4": I4}
+29
+30 def _compute_compliance(self, module, text):
+31 if module.compliance_flag in ("gxp", "validated", "sox", "21_cfr", "hipaa"):
+32 return 3
+33 if module.compliance_flag == "internal_audit":
+34 return 2
+35 if any(kw in text for kw in self.COMPLIANCE_KEYWORDS_HIGH):
+36 return 3
+37 if any(kw in text for kw in self.COMPLIANCE_KEYWORDS_MED):
+38 return 2
+39 return 1
+40
+41 def _compute_financial_data(self, module, text):
+42 if module.data_sensitivity == "financial":
+Python
+43 return 3
+44 if module.data_sensitivity == "pii":
+45 return 3
+46 if module.data_sensitivity == "data_processing":
+47 return 2
+48 if any(kw in text for kw in self.FINANCIAL_KEYWORDS):
+49 return 3
+50 if any(kw in text for kw in self.PII_KEYWORDS):
+51 return 3
+52 if any(kw in text for kw in self.REPORTING_KEYWORDS):
+53 return 2
+54 return 1
+55
+56
+6.3 Risk Engine with SME Override
+1 class RiskEngine:
+2 OVERRIDE_BOOSTS = {
+3 "historical_pain_area": +4,
+4 "recent_incident": +4,
+5 "regulatory_scrutiny": +2,
+6 "customer_complaint_area": +2,
+7 "low_risk_area": -2,
+8 }
+9 FORCE_PRIORITIES = {"force_p1": "P1", "force_p2": "P2",
+10 "force_p3": "P3", "force_p4": "P4"}
+11 def __init__(self, likelihood_computer, impact_computer):
+12 self.lc = likelihood_computer
+13 self.ic = impact_computer
+14
+15 def score(self, condition, app_model, requirement_text, overrides):
+16 likelihood, l_components = self.lc.compute(condition, app_model)
+17 impact, i_components = self.ic.compute(condition, app_model, requirement_text)
+18
+19 raw_score = likelihood * impact
+20
+21 # Apply override
+22 forced = self._find_forced(overrides)
+23 if forced:
+24 priority = self.FORCE_PRIORITIES[forced]
+25 adjusted = raw_score
+26 else:
+27 boost = sum(self.OVERRIDE_BOOSTS.get(f, 0) for f in overrides)
+28 adjusted = max(1.0, raw_score + boost)
+29 priority = self._map_priority(adjusted)
+30
+31 rationale = self._build_rationale(likelihood, impact, overrides, forced)
+32
+33 return {
+34 "riskScore": round(min(adjusted, 9), 1),
+35 "priority": priority,
+36 "riskRationale": rationale,
+37 "riskComponents": {
+38 "likelihood": round(likelihood, 1),
+39 "impact": round(impact, 1),
+40 "rawScore": round(raw_score, 1),
+41 **l_components,
+42 **i_components,
+43 "appliedOverrides": overrides
+44 }
+45 }
+46
+47 def _find_forced(self, overrides):
+48 for ov in overrides:
+49 if ov in self.FORCE_PRIORITIES:
+50 return ov
+Python
+51 return None
+52
+53 def _map_priority(self, score):
+54 if score &gt;= 8.0: return "P1"
+55 if score &gt;= 5.0: return "P2"
+56 if score &gt;= 3.0: return "P3"
+57 return "P4"
+58
+59 def _build_rationale(self, likelihood, impact, overrides, forced):
+60 parts = []
+61
+62 if likelihood &gt;= 2.5:
+63 parts.append("High likelihood (risky technique + complex rules/integrations).")
+64 elif likelihood &gt;= 1.5:
+65 parts.append("Moderate likelihood (standard complexity).")
+66 else:
+67 parts.append("Low likelihood (simple technique, minimal complexity).")
+68
+69 if impact &gt;= 2.5:
+70 parts.append("High impact (critical module + regulatory/financial exposure).")
+71 elif impact &gt;= 1.5:
+72 parts.append("Moderate impact.")
+73 else:
+74 parts.append("Low impact (edge area, minimal exposure).")
+75
+76 if forced:
+77 parts.append(f"Manually forced to {self.FORCE_PRIORITIES[forced]} by SME override.")
+78 elif overrides:
+79 ov_text = ", ".join(overrides)
+80 parts.append(f"Score adjusted by overrides: {ov_text}.")
+81
+82 return " ".join(parts)
+83
+84
+6.4 API Endpoint
+1 @app.post("/api/design/prioritize/{requirement_id}")
+2 async def run_prioritization(requirement_id: str, payload: dict):
+3 project_id = payload["projectId"]
+4 # Fetch conditions for the requirement
+5 conditions = repository.get_conditions(project_id, requirement_id)
+6
+7 # Fetch App Model and overrides
+8 app_model = layer1_client.get_app_model(project_id)
+9 requirement_text = layer1_client.get_requirement(project_id, requirement_id)["text"]
+10 overrides = repository.get_active_overrides(project_id, requirement_id)
+11
+12 # Score each condition
+13 for c in conditions:
+14 risk_data = risk_engine.score(c, app_model, requirement_text, overrides)
+15 c.update(risk_data)
+16 repository.update_condition(c)
+17
+18 # Sort by priority
+19 sorted_conditions = sorted(conditions, key=lambda x: x["riskScore"], reverse=True)
+20 return {"conditions": sorted_conditions}
+21
+22
+Acceptance for STEP 6
+• Every condition gets riskScore, priority, riskRationale
+• All 5 test scenarios pass:
+Python
+a. Low risk (happy path, internal admin) → P4
+b. High risk (negative test on financial module) → P1
+c. Mid risk → P2
+d. Override force_p1 → P1 regardless
+e. Override historical_pain_area → boost +4
+STEP 7: SME Override System (Day 5 Morning)
+7.1 Override APIs
+1 @app.post("/api/sme-override")
+2 async def create_override(payload: dict):
+3 """
+4 Body:
+5 {
+6 "projectId": "...",
+7 "scope": "requirement | module | condition",
+8 "targetId": "...",
+9 "overrideFlag": "force_p1 | historical_pain_area | recent_incident | ...",
+10 "reason": "Mandatory explanation",
+11 "taggedBy": "user email or id",
+12 "expiresAt": "optional ISO date"
+13 }
+14 """
+15 # Validate
+16 valid_flags = {"force_p1", "force_p2", "force_p3", "force_p4",
+17 "historical_pain_area", "recent_incident",
+18 "regulatory_scrutiny", "customer_complaint_area",
+19 "low_risk_area"}
+20 if payload["overrideFlag"] not in valid_flags:
+21 raise HTTPException(400, "Invalid override flag")
+22 if not payload.get("reason"):
+23 raise HTTPException(400, "Reason is mandatory")
+24 # Auto-expire for recent_incident (180 days)
+25 if payload["overrideFlag"] == "recent_incident" and not payload.get("expiresAt"):
+26 payload["expiresAt"] = (datetime.now() + timedelta(days=180)).isoformat()
+27
+28 override_id = repository.save_override(payload)
+29 return {"id": override_id, "status": "created"}
+30 @app.get("/api/sme-override")
+31 async def list_overrides(scope: str = None, targetId: str = None, projectId: str = None):
+32 overrides = repository.list_active_overrides(scope, targetId, projectId)
+33 return {"overrides": overrides}
+34 @app.delete("/api/sme-override/{override_id}")
+35 async def delete_override(override_id: str):
+36 repository.deactivate_override(override_id)
+37 return {"status": "deleted"}
+38
+39
+@app.delete("/api/sme-override/{override_id}")async def delete_override(override_id: 
+str):repository.deactivate_override(override_id)return {"status": "deleted"}
+7.2 Auto-Expiration Background Job
+Python
+Python
+1 # Run daily via cron / scheduler
+2 def expire_old_overrides():
+3 repository.deactivate_expired_overrides(datetime.now())
+4
+Acceptance for STEP 7
+• All 3 endpoints work (POST, GET, DELETE)
+• Mandatory reason enforced
+• Invalid flags rejected
+• Expired overrides auto-deactivated
+STEP 8: Coverage Gap Analysis (Day 5 Afternoon)
+8.1 Similarity Computer
+1 class SimilarityComputer:
+2 def init(self, embedding_client):
+3 self.embedder = embedding_client
+4 def compute_batch(self, condition_texts, existing_test_texts):
+5 """
+6 Returns a matrix of similarity scores [conditions x existing_tests]
+7 """
+8 condition_embeddings = self.embedder.embed_batch(condition_texts)
+9 existing_embeddings = self.embedder.embed_batch(existing_test_texts)
+10
+11 # Cosine similarity matrix
+12 return self._cosine_matrix(condition_embeddings, existing_embeddings)
+13
+14 def _cosine_matrix(self, a, b):
+15 import numpy as np
+16 a_norm = a / np.linalg.norm(a, axis=1, keepdims=True)
+17 b_norm = b / np.linalg.norm(b, axis=1, keepdims=True)
+18 return np.dot(a_norm, b_norm.T)
+19
+20
+8.2 Gap Analyzer
+1 class GapAnalyzer:
+2 COVERED_THRESHOLD = 0.80
+3 PARTIAL_THRESHOLD = 0.60
+4 def __init__(self, similarity_computer):
+5 self.sim = similarity_computer
+6
+7 def analyze(self, conditions, existing_tests):
+8 if not existing_tests:
+9 for c in conditions:
+10 c["coverageStatus"] = "uncovered"
+11 c["matchedTestIds"] = []
+12 return conditions
+13
+14 condition_texts = [f"{c['title']}. {c.get('description', '')}" for c in conditions]
+Python
+Python
+15 existing_texts = [f"{t['title']}. {t.get('description', '')}" for t in existing_tests]
+16
+17 sim_matrix = self.sim.compute_batch(condition_texts, existing_texts)
+18
+19 for i, c in enumerate(conditions):
+20 scores = sim_matrix[i]
+21 best_idx = scores.argmax()
+22 best_score = scores[best_idx]
+23
+24 if best_score &gt;= self.COVERED_THRESHOLD:
+25 c["coverageStatus"] = "covered"
+26 elif best_score &gt;= self.PARTIAL_THRESHOLD:
+27 c["coverageStatus"] = "partially_covered"
+28 else:
+29 c["coverageStatus"] = "uncovered"
+30
+31 matched_ids = [
+32 existing_tests[j]["id"]
+33 for j, score in enumerate(scores)
+34 if score &gt;= self.PARTIAL_THRESHOLD
+35 ]
+36 c["matchedTestIds"] = matched_ids[:3] # top 3
+37
+38 return conditions
+39
+40
+8.3 API Endpoint
+1 @app.post("/api/design/gap-analysis/{requirement_id}")
+2 async def run_gap_analysis(requirement_id: str, payload: dict):
+3 project_id = payload["projectId"]
+4 conditions = repository.get_conditions(project_id, requirement_id)
+5 existing_tests = layer1_client.get_existing_tests(project_id)
+6
+7 conditions = gap_analyzer.analyze(conditions, existing_tests)
+8
+9 # Persist updated coverage status
+10 for c in conditions:
+11 repository.update_condition(c)
+12
+13 summary = {
+14 "totalConditions": len(conditions),
+15 "covered": sum(1 for c in conditions if c["coverageStatus"] == "covered"),
+16 "partiallyCovered": sum(1 for c in conditions if c["coverageStatus"] == "partially_covered"),
+17 "uncovered": sum(1 for c in conditions if c["coverageStatus"] == "uncovered"),
+18 }
+19 return {"summary": summary, "conditions": conditions}
+20
+21
+Acceptance for STEP 8
+• Each condition gets coverage_status
+• Top 3 matched test IDs stored
+• Works correctly when no existing tests (all marked uncovered)
+• Summary counts accurate
+Python
+STEP 9: Classification Engine (Day 6 Morning)
+9.1 Classifier
+1 class ClassificationEngine:
+2 def classify(self, condition, app_model, kb_signals):
+3 tags = []
+4 # Rule 1: Regression
+5 related_defects = condition.get("groundedIn", {}).get("relatedDefects", [])
+6 if related_defects:
+7 tags.append("regression")
+8
+9 if self._has_recent_incidents_for_module(app_model, condition, kb_signals):
+10 if "regression" not in tags:
+11 tags.append("regression")
+12
+13 # Rule 2: Integration
+14 endpoints = condition.get("groundedIn", {}).get("endpoints", [])
+15 modules_touched = self._count_modules_touched(condition, app_model)
+16 if len(endpoints) &gt;= 2 or modules_touched &gt;= 2:
+17 tags.append("integration")
+18
+19 # Rule 3: Smoke
+20 if condition.get("priority") == "P1" and condition.get("technique") == "happy_path":
+21 tags.append("smoke")
+22
+23 # Rule 4: Sanity
+24 priority = condition.get("priority", "P4")
+25 if priority in ("P1", "P2") and condition.get("technique") == "happy_path":
+26 module = self._get_module(condition, app_model)
+27 if module and module.recently_changed:
+28 tags.append("sanity")
+29
+30 # Rule 5: Functional (default)
+31 tags.append("functional")
+32
+33 return list(dict.fromkeys(tags)) # dedupe preserving order
+34
+35 def _has_recent_incidents_for_module(self, app_model, condition, kb_signals):
+36 incidents = kb_signals.get("relatedIncidents", [])
+37 return len(incidents) &gt; 0
+38
+39 def _count_modules_touched(self, condition, app_model):
+40 entities = condition.get("groundedIn", {}).get("entities", [])
+41 modules = set()
+42 for e in entities:
+43 mod = app_model.get_module_for_entity(e)
+44 if mod:
+45 modules.add(mod.name)
+46 return len(modules)
+47
+48 def _get_module(self, condition, app_model):
+49 return app_model.get_module_for_condition(condition)
+50
+51
+9.2 API Endpoint
+1 @app.post("/api/design/classify/{requirement_id}")
+2 async def run_classification(requirement_id: str, payload: dict):
+3 project_id = payload["projectId"]
+4 conditions = repository.get_conditions(project_id, requirement_id)
+Python
+Python
+5 app_model = layer1_client.get_app_model(project_id)
+6 kb_signals = layer1_client.get_kb_signals(project_id, requirement_id, "")
+7
+8 for c in conditions:
+9 c["classifications"] = classifier.classify(c, app_model, kb_signals)
+10 repository.update_condition(c)
+11
+12 return {"conditions": conditions}
+13
+14
+Acceptance for STEP 9
+• Every condition has at least 1 classification
+• Multi-label classification works
+• Tested with all 5 classification paths
+STEP 10: Layer 3 Handoff Hint Generator (Day 6 Afternoon)
+10.1 Handoff Generator
+1 class HandoffHintGenerator:
+2 def generate(self, condition):
+3 return {
+4 "automationTarget": self._infer_target(condition),
+5 "complexityHint": self._infer_complexity(condition),
+6 "estimatedSteps": self._estimate_steps(condition),
+7 "requiresTestData": self._has_data_needs(condition),
+8 "dataPattern": self._infer_data_pattern(condition),
+9 "framework": self._recommend_framework(condition)
+10 }
+11 def _infer_target(self, condition):
+12 grounded = condition.get("groundedIn", {})
+13 has_endpoints = len(grounded.get("endpoints", [])) &gt; 0
+14 has_pages = len(grounded.get("pages", [])) &gt; 0 if "pages" in grounded else False
+15
+16 if has_endpoints and has_pages: return "hybrid"
+17 if has_endpoints: return "api"
+18 return "ui"
+19
+20 def _infer_complexity(self, condition):
+21 technique = condition.get("technique")
+22 endpoints = len(condition.get("groundedIn", {}).get("endpoints", []))
+23 rules = len(condition.get("groundedIn", {}).get("businessRules", []))
+24
+25 if technique == "happy_path" and endpoints &lt;= 1 and rules &lt;= 1:
+26 return "low"
+27 if technique in ("state_transition", "decision_table") or endpoints &gt;= 3:
+28 return "high"
+29 return "medium"
+30
+31 def _estimate_steps(self, condition):
+32 complexity = self._infer_complexity(condition)
+33 return {"low": "3-5", "medium": "6-12", "high": "13-25"}[complexity]
+34
+35 def _has_data_needs(self, condition):
+36 return condition.get("testDataIntent", {}).get("input") is not None
+37
+38 def _infer_data_pattern(self, condition):
+Python
+39 return condition.get("testDataIntent", {}).get("input", "")
+40
+41 def _recommend_framework(self, condition):
+42 target = self._infer_target(condition)
+43 if target == "api": return "rest-assured"
+44 if target == "ui": return "playwright"
+45 return "playwright + rest-assured"
+46
+47
+10.2 Design Package Endpoint
+1 @app.get("/api/design/package/{requirement_id}")
+2 async def get_design_package(requirement_id: str, projectId: str):
+3 conditions = repository.get_conditions(projectId, requirement_id)
+4 app_model = layer1_client.get_app_model(projectId)
+5 requirement = layer1_client.get_requirement(projectId, requirement_id)
+6 # Generate handoff hints for uncovered conditions
+7 for c in conditions:
+8 if c.get("coverageStatus") == "uncovered":
+9 c["handoffHints"] = handoff_generator.generate(c)
+10
+11 package = {
+12 "requirementId": requirement_id,
+13 "requirementText": requirement["text"],
+14 "designSummary": {
+15 "totalConditions": len(conditions),
+16 "uncovered": sum(1 for c in conditions if c["coverageStatus"] == "uncovered"),
+17 "p1Count": sum(1 for c in conditions if c["priority"] == "P1"),
+18 "techniqueDistribution": _count_techniques(conditions),
+19 },
+20 "conditions": conditions,
+21 "generatedAt": datetime.now().isoformat()
+22 }
+23
+24 # Persist design package
+25 repository.save_design_package(projectId, requirement_id, package)
+26
+27 return package
+28
+29
+Acceptance for STEP 10
+• All uncovered conditions have full handoff_hints
+• Design package retrievable in one call
+• Stored in design_packages table
+STEP 11: End-to-End Pipeline + One-Shot Endpoint (Day 7
+Morning)
+11.1 Pipeline Orchestrator
+1 class Layer2Pipeline:
+2 def init(self, layer1, technique_engine, risk_engine,
+Python
+Python
+3 gap_analyzer, classifier, handoff_generator, repository):
+4 self.layer1 = layer1
+5 self.technique = technique_engine
+6 self.risk = risk_engine
+7 self.gap = gap_analyzer
+8 self.classifier = classifier
+9 self.handoff = handoff_generator
+10 self.repo = repository
+11 async def run(self, project_id, requirement_id):
+12 start = time.time()
+13
+14 # 1. Fetch context from Layer 1
+15 context = self.layer1.get_full_context(project_id, requirement_id)
+16
+17 # 2. Run Technique Engine
+18 techinque_output, tokens = self.technique.generate(context)
+19 conditions = techinque_output["conditions"]
+20
+21 # Persist conditions first
+22 for c in conditions:
+23 self.repo.save_condition(project_id, requirement_id, c)
+24
+25 # 3. Risk Prioritization
+26 overrides = self.repo.get_active_overrides(project_id, requirement_id)
+27 for c in conditions:
+28 risk_data = self.risk.score(
+29 c, context["appModel"], context["requirement"]["text"], overrides
+30 )
+31 c.update(risk_data)
+32
+33 # 4. Coverage Gap Analysis
+34 conditions = self.gap.analyze(conditions, context["existingTests"])
+35
+36 # 5. Classification
+37 for c in conditions:
+38 c["classifications"] = self.classifier.classify(
+39 c, context["appModel"], context["kbSignals"]
+40 )
+41
+42 # 6. Handoff Hints (for uncovered only)
+43 for c in conditions:
+44 if c["coverageStatus"] == "uncovered":
+45 c["handoffHints"] = self.handoff.generate(c)
+46
+47 # Persist all updates
+48 for c in conditions:
+49 self.repo.update_condition(c)
+50
+51 # 7. Build and save Design Package
+52 package = self._build_package(project_id, requirement_id, conditions, context)
+53 self.repo.save_design_package(project_id, requirement_id, package)
+54
+55 duration = int((time.time() - start) * 1000)
+56 self.repo.log_generation_run(
+57 project_id, requirement_id,
+58 model="gpt-4o", tokens=tokens,
+59 duration_ms=duration, status="success"
+60 )
+61
+62 return package
+63
+64 def _build_package(self, project_id, requirement_id, conditions, context):
+65 return {
+66 "requirementId": requirement_id,
+67 "requirementText": context["requirement"]["text"],
+68 "designSummary": {
+69 "totalConditions": len(conditions),
+70 "uncovered": sum(1 for c in conditions if c["coverageStatus"] == "uncovered"),
+71 "p1Count": sum(1 for c in conditions if c["priority"] == "P1"),
+72 "techniqueDistribution": self._count_techniques(conditions),
+73 "classificationDistribution": self._count_classifications(conditions),
+74 },
+75 "conditions": conditions,
+76 "generatedAt": datetime.now().isoformat()
+77 }
+78
+79 def _count_techniques(self, conditions):
+80 from collections import Counter
+81 return dict(Counter(c["technique"] for c in conditions))
+82
+83 def _count_classifications(self, conditions):
+84 from collections import Counter
+85 all_class = [cls for c in conditions for cls in c.get("classifications", [])]
+86 return dict(Counter(all_class))
+87
+88
+11.2 One-Shot Endpoint
+1 @app.post("/api/design/run-full/{requirement_id}")
+2 async def run_full_pipeline(requirement_id: str, payload: dict):
+3 project_id = payload["projectId"]
+4 package = await pipeline.run(project_id, requirement_id)
+5 return package
+6
+Acceptance for STEP 11
+• One API call processes a requirement through all 4 sub-components
+• Total time < 30 seconds per requirement
+• Output is the final Design Package
+• All conditions have: risk, priority, coverage, classifications, handoff hints
+STEP 12: Smoke Testing with Sample Inputs (Day 7 Afternoon)
+12.1 Sample Requirements for Testing
+Create 5 sample requirements in /tests/samples/ covering different input types:
+Sample 1: Text Field Validation ( sample_text.json )
+1 {
+2 "id": "REQ-SAMPLE-001",
+3 "title": "User Bio Field Update",
+4 "text": "Users can update their bio field. Bio must be between 0 and 500 characters. Must support
+5 "parsedEntities": {
+6 "inputFields": [
+7 { "name": "Bio", "type": "string", "constraints": "0-500 chars, unicode" }
+8 ],
+9 "businessRules": ["All changes audit-logged"],
+10 "securityConstraints": ["Prevent SQL injection", "Prevent XSS"]
+11 }
+12 }
+13
+Python
+JSON
+Expected: ≥4 techniques, includes BVA + negative_validation + security + happy_path.
+Sample 2: File Upload ( sample_file.json )
+1 {
+2 "id": "REQ-SAMPLE-002",
+3 "title": "Profile Picture Upload",
+4 "text": "Users can upload a profile picture. Accepted formats: PNG, JPG. Max size: 5MB. Min size:
+5 "parsedEntities": {
+6 "inputFields": [
+7 { "name": "ProfilePicture", "type": "file", "constraints": "PNG/JPG, 1KB-5MB" }
+8 ],
+9 "businessRules": ["Virus scan required", "Resize to 256x256"]
+10 }
+11 }
+12
+Expected: ≥4 techniques, includes EP (formats) + BVA (size) + negative_validation + security.
+Sample 3: Multi-State Workflow ( sample_workflow.json )
+1 {
+2 "id": "REQ-SAMPLE-003",
+3 "title": "Document Approval Workflow",
+4 "text": "Documents go through: Draft → Submitted → Under Review → Approved/Rejected → Published. 
+5 "parsedEntities": {
+6 "stateTransitions": [
+7 { "from": "Draft", "to": "Submitted", "trigger": "user submits" },
+8 { "from": "Submitted", "to": "Under Review", "trigger": "reviewer picks up" },
+9 { "from": "Under Review", "to": "Approved", "trigger": "reviewer approves", "guard": "role=review
+10 { "from": "Under Review", "to": "Rejected", "trigger": "reviewer rejects" },
+11 { "from": "Rejected", "to": "Draft", "trigger": "user resubmits" },
+12 { "from": "Approved", "to": "Published", "trigger": "auto-publish" }
+13 ],
+14 "userRoles": ["Author", "Reviewer", "Admin"]
+15 }
+16 }
+17
+Expected: state_transition dominant, ≥4 transitions tested, includes invalid transition tests.
+Sample 4: Decision Logic ( sample_decision.json )
+1 {
+2 "id": "REQ-SAMPLE-004",
+3 "title": "Discount Eligibility Rules",
+4 "text": "Apply discounts based on: Premium member status, cart total > $100, first purchase flag.
+5 "parsedEntities": {
+6 "businessRules": [
+7 "Premium + cart > $100 = 10% discount",
+8 "Premium + cart > $100 + first purchase = 25% discount",
+9 "Non-premium + first purchase = 5% discount",
+10 "Non-premium + cart > $100 = no discount"
+11 ]
+12 }
+13 }
+JSON
+JSON
+JSON
+14
+Expected: decision_table dominant, ≥5 rules tested.
+Sample 5: API CRUD ( sample_api.json )
+1 {
+2 "id": "REQ-SAMPLE-005",
+3 "title": "User Management REST API",
+4 "text": "Build CRUD endpoints for managing users. POST /api/users creates a user (returns 201). G
+5 "parsedEntities": {
+6 "integrations": [
+7 { "method": "POST", "path": "/api/users" },
+8 { "method": "GET", "path": "/api/users/{id}" },
+9 { "method": "PUT", "path": "/api/users/{id}" },
+10 { "method": "DELETE", "path": "/api/users/{id}" }
+11 ],
+12 "securityConstraints": ["Bearer token required"]
+13 }
+14 }
+15
+Expected: ≥4 techniques, includes negative_validation (auth) + security + decision_table (status codes).
+12.2 Smoke Test Script
+1 import pytest
+2 import json
+3 from pathlib import Path
+4 SAMPLES_DIR = Path("tests/samples")
+5 @pytest.mark.parametrize("sample_file", [
+6 "sample_text.json",
+7 "sample_file.json",
+8 "sample_workflow.json",
+9 "sample_decision.json",
+10 "sample_api.json"
+11 ])
+12 async def test_full_pipeline(sample_file):
+13 # Load sample
+14 sample = json.loads((SAMPLES_DIR / sample_file).read_text())
+15 # Ingest into Layer 1 (assumes Layer 1 is set up)
+16 layer1_client.ingest_requirement(TEST_PROJECT_ID, sample)
+17
+18 # Run Layer 2 pipeline
+19 response = await client.post(
+20 f"/api/design/run-full/{sample['id']}",
+21 json={"projectId": TEST_PROJECT_ID}
+22 )
+23
+24 assert response.status_code == 200
+25 package = response.json()
+26
+27 # Assertions
+28 assert package["designSummary"]["totalConditions"] &gt;= 15
+29 assert package["designSummary"]["totalConditions"] &lt;= 40
+30
+31 # Technique coverage check
+32 techniques_used = set(c["technique"] for c in package["conditions"])
+33 assert len(techniques_used) &gt;= 4, f"Only {len(techniques_used)} techniques used"
+34
+35 # Every condition has all required fields
+JSON
+Python
+36 for c in package["conditions"]:
+37 assert "riskScore" in c
+38 assert "priority" in c
+39 assert "coverageStatus" in c
+40 assert "classifications" in c
+41 if c["coverageStatus"] == "uncovered":
+42 assert "handoffHints" in c
+43
+44 # No banned phrases
+45 banned = ["should work correctly", "behaves as expected"]
+46 for c in package["conditions"]:
+47 text = (c.get("title", "") + c.get("description", "")).lower()
+48 for phrase in banned:
+49 assert phrase not in text
+50
+51
+Acceptance for STEP 12
+• All 5 smoke tests pass
+• Each completes in < 30 seconds
+• All packages saved in DB
+• Generation run log captures all runs
+��Final Acceptance Checklist — Layer 2 Done
+# Criteria Check
+1
+1 Database schema deployed (5
+tables)
+⬜
+2
+2 Layer 1 consumer client returns full
+context
+⬜
+3
+3 Technique Engine produces 15-40
+conditions per requirement
+⬜
+4
+4 At least 4 techniques applied per
+requirement
+⬜
+5
+5 Output validator catches banned
+phrases + missing fields
+⬜
+6
+6 Retry logic recovers from validation
+failure (max 2 retries)
+⬜
+7
+7 Risk Engine scores every condition
+(1-9) with priority (P1-P4)
+⬜
+8
+8 All 5 risk scenarios pass (low, mid,
+high, force, booster)
+⬜
+9
+9 SME Override APIs work (POST, GET,
+DELETE)
+⬜
+10
+10 Coverage Gap Analysis marks each
+condition correctly
+⬜
+11
+11 Classification Engine tags all
+conditions with ≥1 label
+⬜
+12
+12 Handoff Hint Generator produces
+valid hints for all uncovered
+conditions
+⬜
+13
+13 One-shot pipeline endpoint works
+end-to-end < 30s
+⬜
+14
+14 All 5 smoke tests pass on diverse
+sample inputs
+⬜
+15
+15 Generation run log captures every
+execution
+⬜
+��API Summary
+Method Endpoint Purpose
+1 POST /api/design/techniques Run Technique Engine only
+2
+POST
+/api/design/prioritize/{reqId
+}
+Run Risk Prioritization only
+3
+POST /api/design/gapanalysis/{reqId}
+Run Coverage Gap only
+4 POST /api/design/classify/{reqId} Run Classification only
+5 POST /api/design/run-full/{reqId} Run full pipeline (one shot)
+6 GET /api/design/package/{reqId} Get Design Package
+7 POST /api/sme-override Create override
+8 GET /api/sme-override List active overrides
+9 DELETE /api/sme-override/{id} Remove override
+��Required Environment Variables
+1 # LLM Configuration
+2 OPENAI_API_KEY=...
+3 LLM_MODEL=gpt-4o
+4 LLM_TEMPERATURE=0.2
+5 LLM_MAX_TOKENS=4000
+6 Embeddings
+7 EMBEDDING_MODEL=text-embedding-3-small
+8 Layer 1 Integration
+9 LAYER1_BASE_URL=http://layer1-service:8000
+10 Database
+11 DB_HOST=...
+12 DB_PORT=5432
+13 DB_NAME=nextgen2
+14 DB_USER=...
+15 DB_PASSWORD=...
+16 Coverage thresholds (configurable)
+17 COVERED_THRESHOLD=0.80
+18 PARTIAL_THRESHOLD=0.60
+19
+20
+COVERED_THRESHOLD=0.80PARTIAL_THRESHOLD=0.60
+��Cost Considerations
+Per requirement processed:
+• LLM tokens: ~3,000 input + ~2,500 output = ~$0.04 (GPT-4o)
+• Embeddings (for gap analysis): ~50 embeddings × $0.00002 = ~$0.001
+Total: ~$0.04 per requirement
+For 100 requirements/day → ~$4/day → reasonable for production.
+��Day-by-Day Execution Plan
+Day Steps Deliverables
+1
+Day 1 Steps 1, 2, 3 DB ready, project scaffolded, Layer 1
+client working
+2
+Day 2 Step 4 Technique Engine producing
+conditions
+Shell
+3 Day 3 Step 5 Validation + retry working reliably
+4
+Day 4 Step 6 Risk Prioritization scoring all
+conditions
+5
+Day 5 Steps 7, 8 SME Overrides + Coverage Gap
+Analysis
+6 Day 6 Steps 9, 10 Classification + Layer 3 Handoff
+7
+Day 7 Steps 11, 12 End-to-end pipeline + smoke tests
+passing
+Once Layer 2 is complete and smoke tests pass, we'll move to Layer 3 analysis.
+• ?
