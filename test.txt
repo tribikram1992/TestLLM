@@ -1,0 +1,52 @@
+
+ABOUT ME
+Strategic AI Product Manager with 14+ years of experience in AI Product Management, Product Operations, and enterprise automation, driving adoption and efficiency across regulated industries. Proven track record in authoring PRDs, leading AI discovery workshops, and building customer-facing Generative AI demos and prototypes to validate business use cases. Skilled in conversational AI, agentic AI workflows, and enterprise-scale automation leveraging Power Platform, SharePoint, and Microsoft 365. Experienced in collaborating with cross-functional stakeholders—from Finance and Procurement to Clinical Trainers and R&D—to uncover AI opportunities, streamline workflows, and scale adoption. Hands-on expertise in LLMs, NLP, prompt engineering, and AI governance, with strong focus on aligning technical execution to business value. Recognized for bridging strategy and engineering to deliver innovative, scalable, and impactful AI-enabled solutions.
+SKILLS
+•	AI & Generative AI: Applied AI, Generative AI Models (LLMs, Transformers), Prompt Engineering, Fine-Tuning & Model Deployment, NLP, Computer Vision, AI Ethics & Governance
+•	AI Tools & Platforms: Microsoft Copilot, ChatGPT, Perplexity AI, Hugging Face, Azure OpenAI Services, Deepseek
+•	Automation & Platforms: Microsoft Power Platform (Power Apps, Power Automate, Power BI, Copilot Studio), Automation Anywhere, Workflow Automation, Low-Code/No-Code Platforms, ServiceNow
+•	Cloud & Data: Microsoft Azure (AI Services, Cognitive Services, Data Platforms), Data Analytics & Business Insights, SQL, API Integration
+•	Product & Strategy: AI Product Management, Product Development, Product Operations Management, Digital Transformation Strategy, Enterprise Architecture, Product Lifecycle Management, Roadmap Development, User Research, Customer Experience, Journey Mapping, Agile & SAFe Delivery
+•	Development & Tools: SharePoint Framework (SPFx, React), Python, C#, ASP.NET, JavaScript, TypeScript, HTML5, CSS3, Bootstrap, REST APIs, Adobe Experience Manager Basics, GitHub, Bitbucket, NPM, Visual Studio Code, Visual Studio Enterprise
+•	Collaboration & Design Tools: Figma, Canva, Miro, ZeroHeight Governance, Jira, Confluence, GA/GTM, Test.io
+•	Leadership & Governance: AI Governance, Vendor & Contract Management, Budget & Resource Allocation, Cross-Functional Team Leadership, Design Thinking Workshops 
+ EDUCATION
+Applied Generative AI Specialization | Purdue University	2025 – 2025
+PG Certificate | Product Management | IIM V	2024 – 2025
+MBA | HR - Marketing | Punjab Technical University	2012 – 2014
+Bachelor Of Technology | Electronics & Communication Engineering | BPUT	2007 – 2011
+ CERTIFICATIONS
+CERTIFIED SAFE® 6 PRODUCT OWNER/PRODUCT MANAGER | BENGALURU	
+https://www.credly.com/badges/2ed32c77-439f-4d81-b4c0-24b924ed677c/linked_in?t=simhbq
+CERTIFIED SCRUM PRODUCT OWNER® | BENGALURU
+https://certification.scrumalliance.org/accounts/1630260-mrutyunjaya/certifications/1918842-cspo	
+MICROSOFT OFFICIAL TRANSCRIPT | BENGALURU
+https://learn.microsoft.com/en-us/users/mrutyunjayamohapatra-5614/transcript/7343gtgep90640q?source=docs
+CERTIFIED AI PROFESSIONAL | MITRA ROBOT | BENGALURU
+CHATGPT 101 | GROWTH SCHOOL | BENGALURU
+https://api.growthschool.io/certificate/c604b8d3-691b-4ee0-9646-a1da7f689f1b
+ PROFESSIONAL EXPERIENCE
+AI PRODUCT MANAGEMENT | BAXTER | BANGALORE | AUG 2019 - PRESENT	
+•	AI Product Management: Partner with AI teams as PSM to evaluate enterprise applications on security, compliance, cost, efficiency, and data privacy; authored PRDs and presented findings to governance councils to drive enterprise-wide AI adoption. Partnered with enterprise customers to validate AI-driven customer interaction prototypes & improved customer support workflows through AI-powered assistants.
+•	Worked on embedding AI into customer-facing workflows (onboarding, support, order management), directly improving agent productivity and customer satisfaction.
+•	AI/ML Ops Process Transformation: Interviewed global AI & ML Ops engineers and PSMs to assess workload challenges, workflow bottlenecks, and delivery inefficiencies. Introduced Agile ways of working, enabling clear sprint objectives, backlog prioritization, and workload balancing—resulting in 40% improved visibility for leadership into resource utilization and project ROI tracking.
+•	Enterprise AI Research, Product Operations & Governance: Conducted detailed assessments of enterprise AI applications—including Miro, Figma, Grammarly, MuleSoft (IBM ACE migration), Microsoft Copilot, Salesforce Einstein, and Genesys AI—to evaluate LLM capabilities, compliance posture, and business value. Developed business cases and presented recommendations to the AI Governance Council for responsible adoption. Established governance frameworks, adoption strategies, and release roadmaps ensuring scalability, compliance, and measurable success across regulated industries.
+•	Conversational AI & Agentic Solutions: Architected AI-powered chatbots, Q&A assistants, and agentic AI workflows, enhancing onboarding, invoice processing, and customer support, directly improving user efficiency and adoption.
+•	Enterprise Agentic AI Platforms & Copilot Enablement: Spearheading the rollout of Microsoft Copilot Studio by developing an “Ask HR” conversational agent to automate policy-related queries at scale—targeting ~9,000+ annual HR tickets in the US region and a potential user base of 30,000 employees. Designed to significantly reduce manual HR workload, improve response time, and enable enterprise-wide self-service. Concurrently leading the transformation of the internal AI portal into an intelligent, agent-enabled platform that centralizes past use cases, governance frameworks, and process knowledge—driving AI adoption, transparency, and compliance alignment.
+•	Cross-Functional Discovery: Collaborated with distributors, Procurement, Finance, Legal, HR, Clinical Trainers, R&D, and Manufacturing to identify AI use cases, streamline workflows, and increase product adoption.
+•	Automation & Efficiency: Enabled AI-driven automation using Power Platform, SharePoint, and Microsoft 365, reducing manual workloads by 25% and accelerating feature releases by 30%.
+•	Design Thinking & Innovation: Facilitated design thinking workshops and discovery sessions with stakeholders to uncover AI use cases, validate prototypes, and refine user journeys with tools like Figma, Miro, and ZeroHeight.
+•	AI & Digital Enablement: Integrated LLMs, NLP, and predictive insights into enterprise solutions, including suggested release dates and pending order predictions, strengthening supply chain visibility and decision-making.
+•	Team Leadership: Led a blended team of vendor and employee developers to deliver enterprise-wide automation platforms and AI-driven applications, ensuring alignment with business strategy.
+•	R&D AI Enablement & Transformation: Defined and delivered an AI enablement roadmap by identifying high-value R&D and operational pain points, translating them into prioritized AI use cases aligned to business outcomes, productivity gains, and responsible AI principles.
+SENIOR SYSTEM ENGINEER | WIPRO | BANGALORE | FEB 2017 - AUG 2019	
+•	Architected and deployed global, enterprise-wide applications using SharePoint, Power Platform, React, and SPFx, delivering scalable and business-aligned solutions adopted across multiple regions.
+•	Spearheaded client systems engineering initiatives from inception, ensuring seamless integration and operational excellence.
+•	Drove talent acquisition efforts by conducting interviews, successfully building a robust team of professionals.
+•	Managed a high-performing onshore team, delivering exceptional service and support in collaboration with Wipro.
+SENIOR SHAREPOINT DEVELOPER | PSMI | BANGALORE | AUG 2016 - JAN 2017	
+Spearheaded SharePoint development projects, delivering robust on-premises and online solutions while mentoring peers in technical skills. Played a key role in building scalable, high-quality applications and strengthening team capability through hands-on guidance and knowledge sharing.
+SOFTWARE DEVELOPER | MPHASIS | PUNE | JAN 2013 - JUL 2016
+Spearheaded offshore development and support teams as a .NET IT Support Specialist, leveraging ServiceNow for efficient incident and change management. Transitioned into a leadership role in SharePoint, serving as the primary liaison for development and support of a mission-critical banking intranet application, while leading the team and building deep expertise in SharePoint solutions.
+ASSOCIATE SOFTWARE ENGINEER | DATAPRO3X SOFTWARE SOLUTIONS(DX3) | BHUBANESWAR | AUG 2011 - DEC 2012	
+Joined Datapro3x as a Trainee and have worked on multiple domestic projects. I got training on ASP.Net and MS SQL post which I was assigned to work in projects under the guidance of senior members. Mostly the projects were based on the stock maintenance and billing of local retailers. 
