@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Hackathon Submission — Strategic Workforce Decision Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#101828;
+    --slate:#475467;
+    --paper:#FBFBF9;
+    --card:#FFFFFF;
+    --band:#0F2A52;
+    --band-text:#EAF0FA;
+    --accent:#B54708;
+    --line:#E4E7EC;
+    --answer-bg:#F6F8FC;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.6;
+    font-size:15px;
+  }
+  .page{max-width:860px;margin:0 auto;padding:48px 28px 80px}
+
+  /* Header */
+  header{border-bottom:3px solid var(--band);padding-bottom:28px;margin-bottom:36px}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:14px
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:700;font-size:34px;line-height:1.18;
+    color:var(--ink);max-width:20ch
+  }
+  .subtitle{margin-top:12px;color:var(--slate);font-size:15px;max-width:60ch}
+  .meta{
+    margin-top:20px;display:flex;gap:28px;flex-wrap:wrap;
+    font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--slate)
+  }
+  .meta span b{color:var(--ink);font-weight:500}
+
+  /* Sections */
+  section{margin-bottom:40px}
+  .section-band{
+    background:var(--band);color:var(--band-text);
+    padding:10px 18px;border-radius:6px 6px 0 0;
+    display:flex;align-items:baseline;gap:14px
+  }
+  .section-band .num{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.1em;
+    color:#8FA8CE
+  }
+  .section-band h2{
+    font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:.01em
+  }
+  .section-body{
+    background:var(--card);border:1px solid var(--line);border-top:none;
+    border-radius:0 0 6px 6px;padding:6px 22px 22px
+  }
+
+  /* Q&A blocks */
+  .qa{padding:18px 0;border-bottom:1px dashed var(--line)}
+  .qa:last-child{border-bottom:none}
+  .q{
+    font-weight:600;font-size:14px;color:var(--ink);margin-bottom:8px;
+    display:flex;gap:10px;align-items:baseline
+  }
+  .q::before{
+    content:"Q";font-family:'IBM Plex Mono',monospace;font-size:11px;
+    color:var(--accent);border:1px solid var(--accent);border-radius:3px;
+    padding:0 5px;line-height:1.5;flex-shrink:0
+  }
+  .a{
+    background:var(--answer-bg);border-left:3px solid var(--band);
+    padding:12px 16px;border-radius:0 4px 4px 0;color:var(--ink);font-size:14.5px
+  }
+  .a ul{margin:6px 0 0 18px}
+  .a li{margin-bottom:6px}
+  .a li:last-child{margin-bottom:0}
+  .a b{font-weight:600}
+  .placeholder{color:var(--accent);font-style:italic}
+  .selection{
+    display:inline-block;background:#EEF2F8;border:1px solid #C9D5E8;
+    border-radius:4px;padding:1px 9px;margin:2px 4px 2px 0;
+    font-size:13px;font-weight:500;color:var(--band)
+  }
+
+  /* Landscape table */
+  table.landscape{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  table.landscape th{
+    background:var(--band);color:var(--band-text);text-align:left;
+    padding:8px 10px;font-weight:600;font-size:12px;letter-spacing:.02em
+  }
+  table.landscape td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.landscape tr:last-child td{border-bottom:none;background:#FDF4EC}
+  table.landscape tr:nth-child(even):not(:last-child) td{background:#FAFBFD}
+
+  footer{
+    margin-top:14px;padding-top:18px;border-top:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--slate)
+  }
+
+  @media print{
+    body{background:#fff}
+    .page{padding:20px}
+    .section-band{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .a{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  @media (max-width:560px){
+    h1{font-size:26px}
+    .section-body{padding:4px 14px 16px}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">AI Hackathon · Idea Submission</div>
+    <h1>Strategic Workforce Decision Intelligence Platform</h1>
+    <p class="subtitle">A complete HR decision intelligence platform — an ontology-driven workforce graph powering retention, skills intelligence, talent mobility, and succession decisions, all explainable and auditable.</p>
+    <div class="meta">
+      <span>Submitted by <b>Tripathy, Tribikram</b></span>
+      <span>Date <b>03 Jul 2026</b></span>
+    </div>
+  </header>
+
+  <!-- SECTION 1 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 1</span><h2>Team Information</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">Team Name</div>
+        <div class="a"><span class="placeholder">[To be filled — team name pending]</span></div>
+      </div>
+      <div class="qa">
+        <div class="q">Team Leader / Primary Contact Name</div>
+        <div class="a">Tripathy, Tribikram</div>
+      </div>
+      <div class="qa">
+        <div class="q">Team Members</div>
+        <div class="a"><span class="placeholder">[To be filled — add member names]</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 2 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 2</span><h2>Idea Basics</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">Idea Title</div>
+        <div class="a">Strategic Workforce Decision Intelligence Platform — Explainable, Graph-Driven Workforce Decisions</div>
+      </div>
+      <div class="qa">
+        <div class="q">Problem Statement in brief</div>
+        <div class="a">HR data lives in disconnected silos — HRMS, performance, learning, skills, engagement, project systems — with no shared vocabulary connecting them. Because of this, every workforce decision (retention, staffing, mobility, succession, workforce planning) is made on partial data, reactively, and without a traceable "why." Leaders discover attrition after resignation letters arrive, skill gaps after projects stall, and succession risks after key people leave. The problem is not one missing report — it is the absence of a connected decision layer over all HR data.</div>
+      </div>
+      <div class="qa">
+        <div class="q">What you want to achieve?</div>
+        <div class="a">
+          Build a complete HR decision intelligence platform on three foundations:
+          <ul>
+            <li><b>HR Ontology</b> — a standard vocabulary that maps every workforce entity (employee, role, skill, certification, project, team, learning path) and their relationships into one living knowledge graph, so all HR data becomes connected and queryable.</li>
+            <li><b>Intelligence modules on that graph</b> — retention &amp; attrition intelligence, skills-gap and readiness analysis, internal talent mobility, and succession/backfill planning. Each module is a different question asked of the same graph, not a separate tool.</li>
+            <li><b>Decision provenance</b> — every insight, score, and recommendation cites the exact evidence it used, and flows through a built-in <b>decision approval workflow</b>: recommendations are routed to the accountable HR/business approver, actioned only on approval, and logged with approver, rationale, and outcome — making all workforce decisions reproducible, auditable, and explainable.</li>
+          </ul>
+          Attrition prediction is the first demonstrated output — the platform's value is that the same connected foundation answers the next workforce question without rebuilding.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 3</span><h2>Business Value</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">What business value does your solution deliver?</div>
+        <div class="a">
+          <span class="selection">Better decision-making</span>
+          <span class="selection">Cost reduction</span>
+          <span class="selection">Employee retention improvement</span>
+          <span class="selection">Risk &amp; compliance improvement</span>
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Describe the expected business impact</div>
+        <div class="a">One connected platform replaces multiple point tools:
+          <ul>
+            <li><b>Retention</b> — attrition risk surfaced 60–90 days early with root cause, reducing regrettable exits and replacement-hiring costs.</li>
+            <li><b>Skills &amp; readiness</b> — live view of organizational skill inventory and gaps against current and future role demand, driving targeted upskilling instead of blanket training spend.</li>
+            <li><b>Internal mobility</b> — employees matched to internal opportunities from the same graph, improving utilization and reducing external hiring.</li>
+            <li><b>Succession &amp; planning</b> — key-person risk and backfill readiness visible before departures, not after.</li>
+            <li><b>Governance</b> — every decision carries an audit-ready evidence trail supporting fairness reviews and compliance.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 4 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 4</span><h2>AI / Technical Details</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">Briefly explain how AI is used in your solution</div>
+        <div class="a">
+          AI operates at three layers of the platform:
+          <ul>
+            <li><b>Ontology &amp; ingestion layer</b> — AI-assisted mapping of raw HR data (employee records, skills, certifications, roles, projects, learning history) into a standardized workforce ontology, building and maintaining the knowledge graph automatically as source systems change.</li>
+            <li><b>Intelligence layer</b> — graph-based models correlate signals across entities: attrition risk scoring with confidence levels (tenure patterns, compensation drift, manager changes, engagement, skill trajectory); skills-gap analysis against role requirements; readiness scoring for mobility and succession.</li>
+            <li><b>Agentic decision layer</b> — AI agents traverse the graph to answer leader questions in plain language ("why is this team at risk?", "who is ready for this role?", "where are our critical skill gaps?"), explain root causes, and recommend interventions — with every answer citing the exact graph evidence used.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What data will your solution require?</div>
+        <div class="a">Internal HR data across four categories: <b>core workforce data</b> (employee profiles, org structure, roles, compensation bands); <b>skills data</b> (skill inventories, certifications, learning records, project assignments); <b>retention-relevant signals</b> (tenure, engagement, manager-change history, historical exits for model validation); and <b>role demand data</b> (open positions, role requirements). Includes personal data — handled under role-based access controls and masking (detailed in Section 5).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 5 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 5</span><h2>Responsible AI / Risk Considerations</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">Does your idea involve any of the following?</div>
+        <div class="a">
+          <span class="selection">Personal data / PII</span>
+          <span class="selection">Bias / fairness considerations</span>
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">What risks do you foresee with this solution?</div>
+        <div class="a">
+          <ul>
+            <li><b>Employee privacy</b> — predictions rely on personal HR records.</li>
+            <li><b>Bias / fairness</b> — risk scores could inadvertently correlate with protected attributes.</li>
+            <li><b>Misuse of predictions</b> — risk scores used punitively rather than supportively.</li>
+            <li><b>Data quality</b> — stale or incomplete HRIS data producing false positives.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">How will you mitigate these risks?</div>
+        <div class="a">
+          <ul>
+            <li><b>Privacy</b> — role-based access controls, data masking, and alignment with organizational data-privacy policy.</li>
+            <li><b>Fairness</b> — protected attributes excluded from model features; periodic fairness audits on score distributions.</li>
+            <li><b>Decision approval workflow</b> — no automated action on people; every recommendation is routed to the accountable HR/business approver, executed only on approval, and logged with approver identity, rationale, and any override — creating a complete accountability trail.</li>
+            <li><b>Explainability by design</b> — every score is traceable to its underlying evidence, so it can be challenged and corrected.</li>
+            <li><b>Data quality</b> — scheduled sync with source HR systems plus data-freshness checks before scoring.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 6 -->
+  <section>
+    <div class="section-band"><span class="num">SECTION 6</span><h2>Innovation and Differentiation</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">What makes your idea innovative?</div>
+        <div class="a">Three things, in combination: (1) an <b>HR ontology</b> as the foundation — a shared vocabulary that connects all workforce data into one graph, which no point solution provides; (2) <b>one graph, many decisions</b> — retention, skills, mobility, and succession are modules over the same connected data, so each new capability costs a fraction of building a new tool; (3) <b>provenance-first AI</b> — every prediction is an explainable path through the graph, and approver decisions and overrides from the decision approval workflow are captured as feedback that improves the system. The "why" is the product, not an afterthought.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Are there existing tools or solutions for this problem? If yes, how is your idea different?</div>
+        <div class="a">Yes — but they are point solutions: HRIS reports and BI dashboards describe what already happened; standalone attrition predictors output opaque scores; internal job-matching tools handle mobility in isolation. This platform is different in kind, not degree: it builds the <b>connected data foundation</b> (ontology + graph) those tools all lack, then delivers retention, skills intelligence, mobility, and succession as views over that one foundation. Each answer is auditable — reproducible, evidence-cited, and governed through a decision approval workflow. A point tool answers one question; this platform answers the organization's next workforce question without being rebuilt.</div>
+      </div>
+      <div class="qa">
+        <div class="q">Do you need any of the following support during the hackathon?</div>
+        <div class="a">
+          <span class="selection">Mentor support</span>
+          <span class="selection">Data access support</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 7 : INTERNAL REFERENCE -->
+  <section>
+    <div class="section-band"><span class="num">REFERENCE</span><h2>Submission Landscape — Ideas Registered So Far</h2></div>
+    <div class="section-body">
+      <div class="qa">
+        <div class="q">Competing submissions visible on the hackathon portal (as of 03 Jul 2026, 5:06 PM)</div>
+        <div class="a" style="padding:0;background:none;border-left:none">
+          <table class="landscape">
+            <thead>
+              <tr><th>Idea Title</th><th>Team Name</th><th>Team Leader</th><th>Problem Space</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>AI-driven Document Retrieval</td><td>HST ERP</td><td>Cheema, Prabkirat</td><td>AI-based document retrieval</td></tr>
+              <tr><td>Reconciliation Automation</td><td>Finance IT Team</td><td>Sundaram, Nithya Alangaran</td><td>Monthly Finance A2R reconciliation</td></tr>
+              <tr><td>Mosaic AI Copilot for Intelligence</td><td>Mosaic AI Innovators</td><td>Manukonda, Divya</td><td>Organizational data/insight access</td></tr>
+              <tr><td>PharmaGuard — AI Packaging</td><td>Pharmaguard Agents</td><td>Singh, Anupam</td><td>Drug safety warning / packaging compliance</td></tr>
+              <tr><td>Generative AI solution (Pharma R&amp;D)</td><td>Data &amp; Analytics — Pharma R&amp;D</td><td>Mukherjee, Subrata</td><td>Generative AI for pharma research</td></tr>
+              <tr><td>AI-Powered DataStage to EDW</td><td>Data Engineering Team</td><td>Neela, Jayaprakash</td><td>IBM DataStage migration/modernization</td></tr>
+              <tr><td>AutoPen Report — AI-Powered</td><td>Product Security</td><td>Maniam, Nagur Babu</td><td>Manual penetration-test reporting</td></tr>
+              <tr><td>Ascend — Talent Mobility &amp; Readiness</td><td>Data Architect</td><td>Dhanapal, Sugavaneshwari</td><td>Internal mobility / talent readiness</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="qa">
+        <div class="q">Positioning note</div>
+        <div class="a">No visible submission addresses workforce decision intelligence or retention. The only HR-adjacent entry is <b>Ascend</b> (talent mobility &amp; readiness matching). Differentiation to state if asked: Ascend matches employees to internal roles; this platform predicts and explains retention risk before resignation, with a fully auditable decision trail — different problem, different timing, different output.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Prepared for AI Hackathon idea submission · All answers final-draft; placeholders marked in italic amber require input before submitting. · Section "Reference" is internal prep only — do not paste into the portal form.
+  </footer>
+
+</div>
+</body>
+</html>
